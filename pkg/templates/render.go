@@ -101,6 +101,7 @@ func NewTemplate(logger logr.Logger) *Template {
 	return &Template{
 		tpls: make(map[string]*template.Template),
 		mu:   sync.RWMutex{},
+		files: make(map[string]*fileupdate),
 		log:  logger,
 	}
 }
@@ -116,7 +117,11 @@ func (t *Template) update(name, filepath string) error {
 	}
 	funcmap := sprig.TxtFuncMap()
 	funcmap["toChar"]=toChar
-	t.tpls[name], err = template.New(name).Funcs(funcmap).ParseFiles(filepath)
+	bs,err :=ioutil.ReadFile(filepath)
+	if err!= nil{
+		return err
+	}
+	t.tpls[name], err = template.New("").Funcs(funcmap).Parse(string(bs))
 	if err != nil {
 		return err
 	}
@@ -148,6 +153,7 @@ func (t *Template) RenderByName(name string, params map[string]interface{}) ([]b
 			return nil, err
 		}
 		if t.files[name].updateTime != finfo.ModTime() {
+			fmt.Printf("update file")
 			err = t.update(name, t.files[name].fpath)
 			if err != nil {
 				return nil, err
@@ -156,7 +162,7 @@ func (t *Template) RenderByName(name string, params map[string]interface{}) ([]b
 			bs := buf.Bytes()
 			return bs, err
 		}
-		err = v.Execute(buf, params)
+		err = v.Execute(os.Stdout, params)
 		bs := buf.Bytes()
 		return bs, err
 	}

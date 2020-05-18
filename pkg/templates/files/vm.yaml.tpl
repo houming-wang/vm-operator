@@ -56,7 +56,7 @@ parameters:
     description:
     default: []
 
-{{ if .network.floating_ip == "enable" }}
+{{ if eq .network.floating_ip "enable" }}
   external_network:
     type: string
     description:
@@ -146,7 +146,7 @@ resources:
   # floating ip
   #
 
-{{ if .network.floating_ip == "enable" }}
+{{ if eq .network.floating_ip "enable" }}
   node_qos_policy:
     type: OS::Neutron::QoSPolicy
 

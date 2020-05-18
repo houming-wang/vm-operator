@@ -24,7 +24,7 @@ parameters:
     default: ""
 {{ end }}
 
-{{ if .network.floating_ip == "enable" }}
+{{ if eq .network.floating_ip "enable" }}
   external_network:
     type: string
     description: uuid/name of a network to use for floating ip addresses
@@ -51,7 +51,7 @@ resources:
       dns_nameservers: {get_param: dns_nameserver}
 {{ end }}
 
-{{ if .network.floating_ip == "enable" }}
+{{ if eq .network.floating_ip "enable" }}
   extrouter:
     type: OS::Neutron::Router
     properties:
@@ -67,7 +67,7 @@ resources:
     {{ else }}
       subnet: {get_resource: fixed_subnet}
     {{ end }}
-{{ endif }}
+{{ end }}
 
 outputs:
 
