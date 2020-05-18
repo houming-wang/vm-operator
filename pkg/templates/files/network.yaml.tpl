@@ -5,15 +5,15 @@ description: >
 
 parameters:
 
-{% if existing_subnet %}
+{{ if .network.existing_subnet }}
   existing_network:
     type: string
     default: ""
 
   existing_subnet:
     type: string
-    default: ""
-{% else %}
+    default: "{{ .network.existing_subnet }}"
+{{ else }}
   private_network_cidr:
     type: string
     description: network range for fixed ip network
@@ -22,13 +22,13 @@ parameters:
     type: string
     description: fixed network name
     default: ""
-{% endif %}
+{{ end }}
 
-{% if floating_ip == "enable" %}
+{{ if .network.floating_ip == "enable" }}
   external_network:
     type: string
     description: uuid/name of a network to use for floating ip addresses
-{% endif %}
+{{ end }}
 
   neutron_az:
     type: comma_delimited_list
@@ -36,7 +36,7 @@ parameters:
 
 resources:
 
-{% if not existing_subnet %}
+{{ if not .network.existing_subnet }}
   fixed_network:
     type: OS::Neutron::Net
     properties:
@@ -49,9 +49,9 @@ resources:
       cidr: {get_param: private_network_cidr}
       network: {get_resource: private_network}
       dns_nameservers: {get_param: dns_nameserver}
-{% endif %}
+{{ end }}
 
-{% if floating_ip == "enable" %}
+{{ if .network.floating_ip == "enable" }}
   extrouter:
     type: OS::Neutron::Router
     properties:
@@ -62,29 +62,29 @@ resources:
     type: OS::Neutron::RouterInterface
     properties:
       router_id: {get_resource: extrouter}
-    {% if existing_subnet %}
+    {{ if .network.existing_subnet }}
       subnet: {get_resource: existing_subnet}
-    {% else %}
+    {{ else }}
       subnet: {get_resource: fixed_subnet}
-    {% endif %}
-{% endif %}
+    {{ end }}
+{{ endif }}
 
 outputs:
 
     fixed_network:
       description: >
         Network ID where to provision machines
-    {% if existing_subnet %}
+    {{ if .network.existing_subnet }}
       value: {get_param: existing_network}
-    {% else %}
+    {{ else }}
       value: {get_resource: fixed_network}
-    {% endif %}
+    {{ end }}
 
     fixed_subnet:
       description: >
         Subnet ID where to provision machines
-    {% if existing_subnet %}
+    {{ if .network.existing_subnet }}
       value: {get_param: existing_subnet}
-    {% else %}
+    {{ else }}
       value: {get_resource: fixed_subnet}
-    {% endif %}
+    {{ end }}

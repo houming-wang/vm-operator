@@ -49,7 +49,7 @@ parameters:
     type: string
     description:
 
-{% if existing_subnet %}
+{{ if .network.existing_subnet }}
   existing_network:
     type: string
     description
@@ -57,7 +57,7 @@ parameters:
   existing_subnet:
     type: string
     description:
-{% else %}
+{{ else }}
   private_network_cidr:
     type: string
     description:
@@ -65,14 +65,14 @@ parameters:
   private_network_name:
     type: string
     description:
-{% endif %}
+{{ end }}
 
   neutron_az:
     type: string
     description:
     default: []
 
-{% if floating_ip == "enable" %}
+{{ if .network.floating_ip == "enable" }}
   external_network:
     type: string
     description:
@@ -85,23 +85,8 @@ parameters:
   floating_ip_bandwidth:
     type: string
     description:
-{% endif %}
+{{ end }}
 
-{% if volume %}
-{% for v in volume %}
-  volume_{{ forloop.counter }}_name:
-    type: string
-    description:
-
-  volume_{{ forloop.counter }}_type:
-    type: string
-    description:
-
-  volume_{{ forloop.counter }}_size:
-    type: string
-    description:
-{% endfor %}
-{% endif %}
 
 resources:
 
@@ -113,16 +98,16 @@ resources:
   network:
     type: network.yaml
     properties:
-    {% if existing_subnet %}
+    {{ if .network.existing_subnet }}
       existing_network: {get_param: fixed_network}
       existing_subnet: {get_param: fixed_subnet}
-    {% else %}
+    {{ else }}
       private_network_name: {get_param: private_network_name}
       private_network_cidr: {get_param: private_network_cidr}
-    {% endif %}
-    {% if floating_ip == "enable" %}
+    {{- end -}}
+    {{- if .network.floating_ip == "enable" }}
       external_network: {get_param: external_network}
-    {% endif %}
+    {{- end -}}
       neutron_az: {get_param: neutron_az}
       private_network_name: ecns-private
 
@@ -162,17 +147,15 @@ resources:
           security_group: {get_param: security_group}
           fixed_network: {get_attr: [network, fixed_network]}
           fixed_subnet: {get_attr: [network, fixed_network]}
-        {% if floating_ip == "enable" %}
+        {{- if .network.floating_ip == "enable" -}}
           external_network: {get_param: external_network}
           floating_ip_bandwidth: {get_param: floating_ip_bandwidth}
-        {% endif %}
-        {% if volume %}
-        {% for v in volume %}
-          volume_{{ forloop.Counter }}_name: {get_param: volume_{{ forloop.Counter }}_name}
-          volume_{{ forloop.Counter }}_type: {get_param: volume_{{ forloop.Counter }}_type}
-          volume_{{ forloop.Counter }}_size: {get_param: volume_{{ forloop.Counter }}_size}
-        {% endfor %}
-        {% endif %}
+        {{- end -}}
+        {{- range $index, $v := .volume -}}
+          volume_{{ $index }}_name: "{{ $v.volume_name }}"
+          volume_{{ $index }}_type: "{{ $v.volume_type }}"
+          volume_{{ $index }}_size: "{{ $v.volume_size }}"
+        {{- end -}}
 
 outputs:
 

@@ -114,7 +114,9 @@ func (t *Template) update(name, filepath string) error {
 		fpath:      filepath,
 		updateTime: finfo.ModTime(),
 	}
-	t.tpls[name], err = template.New(name).Funcs(sprig.FuncMap()).Delims("{%", "}").ParseFiles(filepath)
+	funcmap := sprig.TxtFuncMap()
+	funcmap["toChar"]=toChar
+	t.tpls[name], err = template.New(name).Funcs(funcmap).ParseFiles(filepath)
 	if err != nil {
 		return err
 	}
@@ -162,4 +164,22 @@ func (t *Template) RenderByName(name string, params map[string]interface{}) ([]b
 	err := fmt.Errorf("%s not found template", name)
 	t.log.Error(err, "reander tpl failed")
 	return nil, err
+}
+
+//97 - a
+func toChar(v interface{}) string{
+	switch v := v.(type) {
+	case string:
+		return v
+	case []byte:
+		return string(v)
+	case int:
+		return fmt.Sprintf("%c", rune(v))
+	case int32:
+		return fmt.Sprintf("%c", rune(v))
+	case int64:
+		return fmt.Sprintf("%c", rune(v))
+	default:
+	}
+	return ""
 }

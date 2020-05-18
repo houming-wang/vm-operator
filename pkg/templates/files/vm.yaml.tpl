@@ -56,7 +56,7 @@ parameters:
     description:
     default: []
 
-{% if floating_ip == "enable" %}
+{{ if .network.floating_ip == "enable" }}
   external_network:
     type: string
     description:
@@ -65,23 +65,22 @@ parameters:
   floating_ip_bandwidth:
     type: string
     description:
-{% endif %}
+{{ end }}
 
-{% if volume %}
-{% for v in volume %}
-  volume_{{ forloop.Counter }}_name:
-    type: string
-    description:
 
-  volume_{{ forloop.Counter }}_type:
+{{ range $index, $v := .volume }}
+  volume_{{ $index }}_name:
     type: string
-    description:
+    default: "{{ $v.volume_name }}"
 
-  volume_{{ forloop.Counter }}_size:
+  volume_{{ $index }}_type:
     type: string
-    description:
-{% endfor %}
-{% endif %}
+    default: "{{ $v.volume_type }}"
+
+  volume_{{ $index }}_size:
+    type: string
+    default: "{{ $v.volume_size}}"
+{{ end }}
 
 resources:
 
@@ -90,20 +89,20 @@ resources:
   # vitual machines
   #
 
-{% if softwareConfig %}
+{{ if .softwareConfig }}
   software_config:
     type: OS::Heat::SoftwareConfig
     properties:
       group: ungrouped
       config: |
-        {{ softwareConfig }}
+        {{ indent 8 .softwareConfig }}
 
   node_bootstrap:
     type: OS::Heat::MultipartMime
     properties:
       parts:
         - config: {get_resource: software_config}
-{% endif %}
+{{ end }}
 
   node_boot_volume:
     type: OS::Cinder::Volume
@@ -147,7 +146,7 @@ resources:
   # floating ip
   #
 
-{% if floating_ip == "enable" %}
+{{ if .network.floating_ip == "enable" }}
   node_qos_policy:
     type: OS::Neutron::QoSPolicy
 
@@ -163,7 +162,7 @@ resources:
       floating_network: {get_param: external_network}
       port_id: {get_resource: node_eth0}
       qos_policy: {get_resource: node_qos_policy}
-{% endif %}
+{{ end }}
 
 
   ######################################################################
@@ -171,20 +170,19 @@ resources:
   # data volumes
   #
 
-  {% if volume %}
-  {% for v in volume %}
-  data_volume_{{ forloop.Counter }}:
+{{- range $index, $v := .volume -}}
+{{ $char := add $index 98 }}
+  data_volume_{{ $index }}:
     type: OS::Cinder::Volume
     properties:
-      name: {get_param: volume_{{ forloop.Counter }}_name}
-      size: {get_param: volume_{{ forloop.Counter }}_size}
-      volume_type: {get_param: volume_{{ forloop.Counter }}_type}
+      name: {get_param: volume_{{ $index }}_name}
+      size: {get_param: volume_{{ $index }}_size}
+      volume_type: {get_param: volume_{{ $index }}_type}
 
-  data_volume_attach_{{ forloop.Counter }}:
+  data_volume_attach_{{ $index }}:
     type: OS::Cinder::VolumeAttachment
     properties:
       instance_uuid: {get_resource: mixapp_node}
-      volume_id: {get_resource: data_volume_{{ forloop.Counter }}}
-      mountpoint: /dev/vd{{ loop.cycle('b','c','d','e','f','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z') }}
-  {% endfor %}
-  {% endif %}
+      volume_id: {get_resource: data_volume_{{ $index }}}
+      mountpoint: /dev/vd{{ toChar $char }}
+{{- end -}}
