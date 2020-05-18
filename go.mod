@@ -15,10 +15,11 @@ require (
 	github.com/peterh/liner v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.6.0 // indirect
 	github.com/spf13/cobra v1.0.0 // indirect
+	github.com/tidwall/gjson v1.6.0
 	go.starlark.net v0.0.0-20200330013621-be5394c419b6 // indirect
 	golang.org/x/arch v0.0.0-20200312215426-ff8b605520f4 // indirect
 	golang.org/x/sys v0.0.0-20200501145240-bc7a7d42d5c3 // indirect
-	gopkg.in/yaml.v2 v2.2.8
+	gopkg.in/yaml.v2 v2.2.8 // indirect
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v0.17.2
 	sigs.k8s.io/controller-runtime v0.5.0

@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -34,6 +35,10 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+	metricsAddr string
+	enableLeaderElection bool
+	nettpl,vmtpl,vmgtpl,tmpdir string
+	pollingPeriod string
 )
 
 func init() {
@@ -44,27 +49,30 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var configDir string
-	var pollingPeriod int
-
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
+	flag.BoolVar(&enableLeaderElection, "enable-leader-election", true,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&metricsAddr, "metrics-addr", "127.0.0.1:9446", "The address the metric endpoint binds to.")
-	flag.StringVar(&configDir, "config-dir", "/etc/vm-operator", "Operator config dir")
-	flag.IntVar(&pollingPeriod, "polling-period", 5, "Polling period of vm status.")
+	flag.StringVar(&nettpl, "net-tpl-file", "/etc/vm-operator", "net tpl file path")
+	flag.StringVar(&vmtpl, "vm-tpl-file", "/etc/vm-operator", "vm tpl file path")
+	flag.StringVar(&vmgtpl, "vmg-tpl-file", "/etc/vm-operator", "vm group tpl file path")
+	flag.StringVar(&tmpdir, "tmp-dir", "/tmp", "tmp dir ,should can write ")
+	flag.StringVar(&pollingPeriod, "polling-period", "5s", "Polling period of vm status.")
+
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	oss, err := osservice.NewOSService(configDir, ctrl.Log.WithName("VM"))
+	oss, err := osservice.NewOSService(nettpl,vmtpl,vmgtpl,tmpdir, ctrl.Log.WithName("OpenStack"),controllers.GetSpecNull)
 	if err != nil {
 		setupLog.Error(err, "unable to init openstack service")
 		os.Exit(1)
 	}
-
+	du,err := time.ParseDuration(pollingPeriod)
+	if err != nil {
+		setupLog.Error(err, "unable to parse duration","str",pollingPeriod)
+		os.Exit(1)
+	}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
@@ -76,16 +84,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	vm := controllers.NewVirtualMachine(mgr.GetClient(), mgr.GetAPIReader(), ctrl.Log.WithName("VM"), oss, pollingPeriod)
-	// init vm cache from crd info
-	err = vm.InitVmCacheFromCRD()
+	vm := controllers.NewVirtualMachine(mgr.GetClient(), mgr.GetAPIReader(), ctrl.Log.WithName("Controller"), oss)
+	err = vm.PollingVmInfo(du)
 	if err != nil {
-		setupLog.Error(err, "failed to init vm cache")
+		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-
-	// periodically polling
-	go vm.PollingVmInfo()
 
 	if err = vm.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "VirtualMachine")
