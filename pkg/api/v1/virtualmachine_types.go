@@ -36,7 +36,7 @@ type VirtualMachineSpec struct {
 	Server         ServerSpec        `json:"server,omitempty"`
 	Network        NetworkSpec       `json:"network,omitempty"`
 	Volume         []VolumeSpec      `json:"volume,omitempty"`
-	SoftwareConfig []byte           `json:"softwareConfig,omitempty"`
+	SoftwareConfig []byte            `json:"softwareConfig,omitempty"`
 	AssemblyPhase  AssemblyPhaseType `json:"assemblyPhase,omitempty"`
 	StackID        string            `json:"stackID,omitempty"`
 	HeatEvent      []string          `json:"heatEvent,omitempty"`

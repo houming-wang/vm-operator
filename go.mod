@@ -22,5 +22,6 @@ require (
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v0.17.2
+	github.com/Masterminds/sprig v3.1.0
 	sigs.k8s.io/controller-runtime v0.5.0
 )

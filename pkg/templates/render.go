@@ -1,14 +1,18 @@
 package templates
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/flosch/pongo2"
-	"github.com/go-logr/logr"
 	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
+
+	"github.com/Masterminds/sprig"
+	"github.com/flosch/pongo2"
+	"github.com/go-logr/logr"
 )
 
 type VmTemplate struct {
@@ -16,6 +20,14 @@ type VmTemplate struct {
 	DstTplDir string
 	TplCtx    pongo2.Context
 }
+
+var (
+	bufpool = sync.Pool{
+		New: func() interface{} {
+			return new(bytes.Buffer)
+		},
+	}
+)
 
 func New(srcTplDir string, dstTplDir string, tplCtx pongo2.Context) *VmTemplate {
 	return &VmTemplate{
@@ -73,77 +85,81 @@ func (vt *VmTemplate) getRawTemplateFiles() ([]string, error) {
 }
 
 type fileupdate struct {
-	fpath string
+	fpath      string
 	updateTime time.Time
 }
 
 type Template struct {
-	tpls map[string]*pongo2.Template
+	tpls  map[string]*template.Template
 	files map[string]*fileupdate
 
-	mu sync.RWMutex
+	mu  sync.RWMutex
 	log logr.Logger
 }
 
 func NewTemplate(logger logr.Logger) *Template {
 	return &Template{
-		tpls: make(map[string]*pongo2.Template),
+		tpls: make(map[string]*template.Template),
 		mu:   sync.RWMutex{},
 		log:  logger,
 	}
 }
 
-func (t *Template) update(name,filepath  string) error{
+func (t *Template) update(name, filepath string) error {
 	finfo, err := os.Stat(filepath)
-	if err!= nil {
+	if err != nil {
 		return err
 	}
-	t.files[name]=&fileupdate{
-		fpath: filepath,
+	t.files[name] = &fileupdate{
+		fpath:      filepath,
 		updateTime: finfo.ModTime(),
 	}
-
-	t.tpls[name],err = pongo2.FromFile(filepath)
-	if err!= nil{
+	t.tpls[name], err = template.New(name).Funcs(sprig.FuncMap()).Delims("{%", "}").ParseFiles(filepath)
+	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *Template) AddTempFileMust(name string,filepath string) {
+func (t *Template) AddTempFileMust(name string, filepath string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if _,ok:=t.tpls[name];ok{
-		t.log.Info("update template","name",name)
+	if _, ok := t.tpls[name]; ok {
+		t.log.Info("update template", "name", name)
 	}
-	err := t.update(name,filepath)
-	if err!= nil{
+	err := t.update(name, filepath)
+	if err != nil {
 		panic(err)
 	}
-	t.log.Info("add template","name",name,"filepath",filepath)
+	t.log.Info("add template", "name", name, "filepath", filepath)
 	return
 }
 
-
-func (t *Template) RenderByName(name string, params map[string]interface{}) ([]byte, error){
+func (t *Template) RenderByName(name string, params map[string]interface{}) ([]byte, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if v, ok:=t.tpls[name];ok{
+	buf := bufpool.Get().(*bytes.Buffer)
+	defer bufpool.Put(buf)
+	if v, ok := t.tpls[name]; ok {
 		finfo, err := os.Stat(t.files[name].fpath)
-		if err!=nil{
-			return nil,err
+		if err != nil {
+			return nil, err
 		}
-		if t.files[name].updateTime!=finfo.ModTime(){
-			err = t.update(name,t.files[name].fpath)
-			if err!=nil{
-				return nil,err
+		if t.files[name].updateTime != finfo.ModTime() {
+			err = t.update(name, t.files[name].fpath)
+			if err != nil {
+				return nil, err
 			}
-			return t.tpls[name].ExecuteBytes(pongo2.Context(params))
+			err = t.tpls[name].Execute(buf, params)
+			bs := buf.Bytes()
+			return bs, err
 		}
-		return v.ExecuteBytes(pongo2.Context(params))
+		err = v.Execute(buf, params)
+		bs := buf.Bytes()
+		return bs, err
 	}
 
-	err :=  fmt.Errorf("%s not found template",name)
-	t.log.Error(err,"reander tpl failed")
+	err := fmt.Errorf("%s not found template", name)
+	t.log.Error(err, "reander tpl failed")
 	return nil, err
 }

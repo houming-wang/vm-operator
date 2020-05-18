@@ -1,11 +1,10 @@
 package openstack
 
 import (
-	"sync"
 	"fmt"
 	"github.com/gophercloud/gophercloud"
+	"sync"
 )
-
 
 // use projectID as key
 type ClientCache struct {
@@ -19,7 +18,7 @@ func (c *ClientCache) getClient(id string) (*gophercloud.ServiceClient, error) {
 	defer c.mu.RUnlock()
 	cli, ok := c.clientMap[id]
 	if !ok {
-		err := fmt.Errorf("client id(%s) not found",id)
+		err := fmt.Errorf("client id(%s) not found", id)
 		return nil, err
 	}
 	return cli, nil
@@ -36,4 +35,3 @@ func (c *ClientCache) delClient(id string) {
 	defer c.mu.Unlock()
 	delete(c.clientMap, id)
 }
-

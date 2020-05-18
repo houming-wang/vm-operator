@@ -2,32 +2,32 @@ package openstack
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"os"
-	"fmt"
-	"path"
-	"time"
-	"sync"
 	vmv1 "easystack.io/vm-operator/pkg/api/v1"
 	"easystack.io/vm-operator/pkg/templates"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path"
+	"sync"
+	"time"
 
-	"github.com/tidwall/gjson"
 	"github.com/go-logr/logr"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/orchestration/v1/stacks"
+	"github.com/tidwall/gjson"
 )
 
 const (
-	defaultTimeout = 10
-	CLOUDADMIN = "drone"
-	stackDefaultTag   = "ecns-mixapp"
+	defaultTimeout  = 10
+	CLOUDADMIN      = "drone"
+	stackDefaultTag = "ecns-mixapp"
 
-	vmtplname = "vm.yaml"
+	vmtplname  = "vm.yaml"
 	nettplname = "network.yaml"
 	vmgTplName = "vm_group.yaml"
-	mainTpl = vmgTplName
+	mainTpl    = vmgTplName
 )
 
 const (
@@ -50,28 +50,27 @@ var (
 )
 
 type StatStack struct {
-	Id string
-	Name string
-	Status string
+	Id           string
+	Name         string
+	Status       string
 	Statusreason string
 }
 
 type vm struct {
-	stat *StatStack
+	stat       *StatStack
 	latestSpec *vmv1.VirtualMachineSpec
 }
 
 type OSService struct {
-
 	AdminAuthOpt *gophercloud.AuthOptions
 	ClientCache  *ClientCache
 
 	logger logr.Logger
 	engine *templates.Template
-	tmpDir 	string //need rw mode
-	tmpmu sync.Mutex
+	tmpDir string //need rw mode
+	tmpmu  sync.Mutex
 
-	stackch chan *StatStack
+	stackch   chan *StatStack
 	getSpecFn func(name string) *vmv1.VirtualMachine
 }
 
@@ -80,11 +79,11 @@ type UserCredential struct {
 	ApplicationCredentialSecret string
 }
 
-func NewOSService(nettplpath,vmtplpath,vmgtplpath,tmpdir  string, logger logr.Logger, getSpecFn func(name string) *vmv1.VirtualMachine) (*OSService, error) {
+func NewOSService(nettplpath, vmtplpath, vmgtplpath, tmpdir string, logger logr.Logger, getSpecFn func(name string) *vmv1.VirtualMachine) (*OSService, error) {
 	// get ECS cloud admin credential info from env
 	adminAuthOpt, err := openstack.AuthOptionsFromEnv()
 	if err != nil {
-		logger.Error(err,"Failed to get environments")
+		logger.Error(err, "Failed to get environments")
 		return nil, err
 	}
 
@@ -110,30 +109,29 @@ func NewOSService(nettplpath,vmtplpath,vmgtplpath,tmpdir  string, logger logr.Lo
 	oss := &OSService{
 		AdminAuthOpt: &adminAuthOpt,
 		ClientCache:  cc,
-		logger:    logger,
-		stackch: make(chan *StatStack, 4),
-		getSpecFn: getSpecFn,
+		logger:       logger,
+		stackch:      make(chan *StatStack, 4),
+		getSpecFn:    getSpecFn,
 	}
-	err = oss.probe(nettplpath,vmtplpath,vmgtplpath,tmpdir)
-	return oss,err
+	err = oss.probe(nettplpath, vmtplpath, vmgtplpath, tmpdir)
+	return oss, err
 }
 
-
-func (oss *OSService) probe(nettplpath,vmtplpath,vmgtplpath,tmpdir string) error {
+func (oss *OSService) probe(nettplpath, vmtplpath, vmgtplpath, tmpdir string) error {
 	tmpl := templates.NewTemplate(oss.logger)
-	for k,v:=range map[string]string{
-		nettplname:nettplpath,
-		vmtplname:vmtplpath,
-		vmgTplName:vmgtplpath,
-	}{
-		tmpl.AddTempFileMust(k,v)
+	for k, v := range map[string]string{
+		nettplname: nettplpath,
+		vmtplname:  vmtplpath,
+		vmgTplName: vmgtplpath,
+	} {
+		tmpl.AddTempFileMust(k, v)
 	}
 	oss.engine = tmpl
 	//TODO, single template file not need change workdir
 	return os.Chdir(tmpdir)
 }
 
-func (oss *OSService) newHeatClient( projectID string, token string) error {
+func (oss *OSService) newHeatClient(projectID string, token string) error {
 	if projectID == CLOUDADMIN {
 		oss.logger.Info("Already has cloudadmin client during initialization")
 		return nil
@@ -161,14 +159,14 @@ func (oss *OSService) newHeatClient( projectID string, token string) error {
 }
 
 func (oss *OSService) getheatClient(projectID string, token string) (*gophercloud.ServiceClient, error) {
-	client,err := oss.ClientCache.getClient(projectID)
-	if err== nil {
+	client, err := oss.ClientCache.getClient(projectID)
+	if err == nil {
 		return client, nil
 	}
 	oss.logger.WithName("WARN").Info(err.Error())
 	err = oss.newHeatClient(projectID, token)
 	if err != nil {
-		oss.logger.Error(err,"create heat client conn failed","projectid",projectID,"token",token)
+		oss.logger.Error(err, "create heat client conn failed", "projectid", projectID, "token", token)
 		return nil, err
 	}
 
@@ -183,27 +181,27 @@ func (oss *OSService) PollingForever(ctx context.Context, duratime time.Duration
 		for {
 			select {
 			case <-time.NewTimer(duratime).C:
-				cli,err := oss.getheatClient(CLOUDADMIN,"")
-				if err!=nil {
+				cli, err := oss.getheatClient(CLOUDADMIN, "")
+				if err != nil {
 					continue
 				}
-				now:=time.Now()
+				now := time.Now()
 				//TODO
-				err = iterStat(cli,stacks.ListOpts{Tags: stackDefaultTag}, func(st *stacks.ListedStack) error {
-					oss.logger.V(2).Info("iter stack","stack",st)
-					deepcopyStat(st,stackS)
+				err = iterStat(cli, stacks.ListOpts{Tags: stackDefaultTag}, func(st *stacks.ListedStack) error {
+					oss.logger.V(2).Info("iter stack", "stack", st)
+					deepcopyStat(st, stackS)
 					// oss.getSpecFn(stackS.Name)
 					// use use oss.stackCh try again if failed
 					return updateFn(stackS)
 				})
-				if err!= nil {
-					oss.logger.Error(err,"poll stack status failed")
+				if err != nil {
+					oss.logger.Error(err, "poll stack status failed")
 				}
 				subdu := now.Sub(time.Now())
-				if subdu >duratime {
-					oss.logger.WithValues("level","WARN").Info(fmt.Sprintf("poll stack take time %s",subdu.String()),"timer",duratime)
+				if subdu > duratime {
+					oss.logger.WithValues("level", "WARN").Info(fmt.Sprintf("poll stack take time %s", subdu.String()), "timer", duratime)
 				}
-			case <- ctx.Done():
+			case <-ctx.Done():
 				oss.logger.Info("polling exit...")
 				return
 			}
@@ -212,43 +210,43 @@ func (oss *OSService) PollingForever(ctx context.Context, duratime time.Duration
 	return
 }
 
-func (oss *OSService) Delete(ctx context.Context,name, id string, spec *vmv1.VirtualMachineSpec) (*vmv1.VirtualMachineStatus,error){
+func (oss *OSService) Delete(ctx context.Context, name, id string, spec *vmv1.VirtualMachineSpec) (*vmv1.VirtualMachineStatus, error) {
 	var (
 		err error
 		sts = vmv1.VirtualMachineStatus{
-			VmStatus:S_DELETE_FAILED,
-			StackID: id,
+			VmStatus: S_DELETE_FAILED,
+			StackID:  id,
 		}
-		projectid,projecttoken string
+		projectid, projecttoken string
 	)
-	if name == "" || id == ""{
+	if name == "" || id == "" {
 		return &sts, fmt.Errorf("Id and Name not define!")
 	}
 	projectid, projecttoken = getIdToken(spec)
 	client, err := oss.getheatClient(projectid, projecttoken)
 	if err != nil {
-		oss.logger.WithValues("function","Delete").Error(err, "Failed to get heat client")
+		oss.logger.WithValues("function", "Delete").Error(err, "Failed to get heat client")
 		return &sts, err
 	}
 	err = stacks.Delete(client, name, id).ExtractErr()
 	if err == nil {
 		sts.VmStatus = S_DELETE_IN_PROGRESS
-	}else{
+	} else {
 		//only one ,deleted
 		sts.VmStatus = S_DELETE_COMPLETE
 	}
-	oss.logger.WithValues("heat","delete").Info("delete stack","err",err)
+	oss.logger.WithValues("heat", "delete").Info("delete stack", "err", err)
 	return &sts, nil
 }
 
 // create if id not exist, update if id exist
 // check spec before
-func (oss *OSService) CreateOrUpdate(ctx context.Context, name,id string, spec *vmv1.VirtualMachineSpec) (*vmv1.VirtualMachineStatus,error) {
+func (oss *OSService) CreateOrUpdate(ctx context.Context, name, id string, spec *vmv1.VirtualMachineSpec) (*vmv1.VirtualMachineStatus, error) {
 	// TODO VirtualMachineStatus pool
 	var (
 		err error
 		sts = vmv1.VirtualMachineStatus{
-			VmStatus:S_CREATE_FAILED,
+			VmStatus: S_CREATE_FAILED,
 		}
 	)
 	if name == "" {
@@ -258,68 +256,67 @@ func (oss *OSService) CreateOrUpdate(ctx context.Context, name,id string, spec *
 	projectid, projecttoken := getIdToken(spec)
 	client, err := oss.getheatClient(projectid, projecttoken)
 	if err != nil {
-		oss.logger.WithValues("function","CreateOrUpdate").Error(err, "Failed to get heat client")
+		oss.logger.WithValues("function", "CreateOrUpdate").Error(err, "Failed to get heat client")
 		return &sts, err
 	}
 	if id == "" {
-		cs,err := oss.create(client,spec)
-		if oss.logger.V(2).Enabled(){
-			oss.logger.WithValues("heat","create").Info("create stack","err",err)
+		cs, err := oss.create(client, spec)
+		if oss.logger.V(2).Enabled() {
+			oss.logger.WithValues("heat", "create").Info("create stack", "err", err)
 		}
-		if err!= nil {
-			return &sts,err
+		if err != nil {
+			return &sts, err
 		}
 		sts.VmStatus = S_CREATE_IN_PROGRESS
 		sts.StackID = cs.ID
-		return &sts,nil
+		return &sts, nil
 	}
-	sts.StackID=id
-	err = oss.update(client, name,id, spec)
-	if oss.logger.V(2).Enabled(){
-		oss.logger.WithValues("heat","update").Info("update stack","err",err,"stackid",id)
+	sts.StackID = id
+	err = oss.update(client, name, id, spec)
+	if oss.logger.V(2).Enabled() {
+		oss.logger.WithValues("heat", "update").Info("update stack", "err", err, "stackid", id)
 	}
-	if err!= nil {
+	if err != nil {
 		sts.VmStatus = S_UPDATE_FAILED
-		return &sts,err
-	}else{
+		return &sts, err
+	} else {
 		sts.VmStatus = S_UPDATE_IN_PROGRESS
 	}
-	return &sts,err
+	return &sts, err
 }
 
-
-func (oss *OSService) create(cli *gophercloud.ServiceClient,spec *vmv1.VirtualMachineSpec) (*stacks.CreatedStack,error) {
+func (oss *OSService) create(cli *gophercloud.ServiceClient, spec *vmv1.VirtualMachineSpec) (*stacks.CreatedStack, error) {
 	var (
-		err error
+		err    error
 		ctOpts *stacks.CreateOpts
 	)
 	oss.tmpmu.Lock()
 	defer oss.tmpmu.Unlock()
-	err = oss.generatTemp(spec, func(params map[string]interface{},template *stacks.Template) {
-		ctOpts= &stacks.CreateOpts{
-			TemplateOpts:    template,
-			Timeout:         defaultTimeout,
+	err = oss.generatTemp(spec, func(params map[string]interface{}, template *stacks.Template) {
+		ctOpts = &stacks.CreateOpts{
+			TemplateOpts: template,
+			Timeout:      defaultTimeout,
 			Parameters:   params,
 			Tags:         []string{stackDefaultTag},
 		}
 	})
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
-	return stacks.Create(cli,ctOpts).Extract()
+	return stacks.Create(cli, ctOpts).Extract()
 }
 
-func (oss *OSService) update(cli *gophercloud.ServiceClient,name,id string,spec *vmv1.VirtualMachineSpec) error {
+func (oss *OSService) update(cli *gophercloud.ServiceClient, name, id string, spec *vmv1.VirtualMachineSpec) error {
 	var (
-		err error
+		err    error
 		upOpts *stacks.UpdateOpts
 	)
 	oss.tmpmu.Lock()
 	defer oss.tmpmu.Unlock()
-	err = oss.generatTemp(spec, func(params map[string]interface{},template *stacks.Template) {
-		upOpts= &stacks.UpdateOpts{
-			TemplateOpts:    template,
-			Timeout:         defaultTimeout,
+	err = oss.generatTemp(spec, func(params map[string]interface{}, template *stacks.Template) {
+		upOpts = &stacks.UpdateOpts{
+			TemplateOpts: template,
+			Timeout:      defaultTimeout,
 			Parameters:   params,
 			Tags:         []string{stackDefaultTag},
 		}
@@ -327,56 +324,56 @@ func (oss *OSService) update(cli *gophercloud.ServiceClient,name,id string,spec 
 	if err != nil {
 		return err
 	}
-	return stacks.Update(cli,name,id,upOpts).ExtractErr()
+	return stacks.Update(cli, name, id, upOpts).ExtractErr()
 }
 
 func (oss *OSService) generatTemp(spec *vmv1.VirtualMachineSpec, fn func(params map[string]interface{}, template *stacks.Template)) error {
 	var (
 		params = make(map[string]interface{})
-		data []byte
-		err error
+		data   []byte
+		err    error
 	)
-	data,err =json.Marshal(spec)
-	if err!= nil {
+	data, err = json.Marshal(spec)
+	if err != nil {
 		return err
 	}
 	//TODO now we just neet network,volume and server sections
-	for _, v :=range []string{"network","volume","server"}{
-		params[v]=parse(gjson.GetBytes(data,v))
+	for _, v := range []string{"network", "volume", "server"} {
+		params[v] = parse(gjson.GetBytes(data, v))
 	}
 
-	for _, v := range []string{nettplname,vmgTplName,vmtplname}{
-		data,err = oss.engine.RenderByName(v,params)
-		fi,err:=os.OpenFile(path.Join(oss.tmpDir,v),os.O_CREATE|os.O_TRUNC|os.O_RDWR,os.ModePerm)
-		if err!= nil {
+	for _, v := range []string{nettplname, vmgTplName, vmtplname} {
+		data, err = oss.engine.RenderByName(v, params)
+		fi, err := os.OpenFile(path.Join(oss.tmpDir, v), os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.ModePerm)
+		if err != nil {
 			return err
 		}
-		_,err = fi.Write(data)
-		if err!= nil {
-			oss.logger.Error(err,"write config file failed","filename",v)
+		_, err = fi.Write(data)
+		if err != nil {
+			oss.logger.Error(err, "write config file failed", "filename", v)
 			fi.Close()
 			return err
 		}
 		err = fi.Close()
-		if err!= nil {
-			oss.logger.Error(err,"close config file failed","filename",v)
+		if err != nil {
+			oss.logger.Error(err, "close config file failed", "filename", v)
 			return err
 		}
 	}
 	template := &stacks.Template{
 		TE: stacks.TE{
-			URL: "file://"+path.Join(oss.tmpDir,mainTpl),
+			URL: "file://" + path.Join(oss.tmpDir, mainTpl),
 		},
 	}
-	fn(params,template)
+	fn(params, template)
 	return nil
 }
 
-func parse(result gjson.Result) interface{}{
+func parse(result gjson.Result) interface{} {
 	if result.IsArray() {
 		var rets []interface{}
 		result.ForEach(func(_, value gjson.Result) bool {
-			rets=append(rets,parse(value))
+			rets = append(rets, parse(value))
 			return true
 		})
 		return rets
@@ -386,7 +383,7 @@ func parse(result gjson.Result) interface{}{
 		result.ForEach(func(key, value gjson.Result) bool {
 			//TODO only string type
 			if key.Type == gjson.String {
-				rets[key.String()]=parse(value)
+				rets[key.String()] = parse(value)
 			}
 			return true
 		})
@@ -406,33 +403,33 @@ func parse(result gjson.Result) interface{}{
 	}
 }
 
-func iterStat(cli *gophercloud.ServiceClient, opts stacks.ListOpts,fn func(st *stacks.ListedStack) error) error {
-	stacks.List(cli,opts)
+func iterStat(cli *gophercloud.ServiceClient, opts stacks.ListOpts, fn func(st *stacks.ListedStack) error) error {
+	stacks.List(cli, opts)
 	allStackPages, err := stacks.List(cli, opts).AllPages()
 	if err != nil {
 		return err
 	}
 	lists, err := stacks.ExtractStacks(allStackPages)
-	if err!= nil{
+	if err != nil {
 		return err
 	}
-	for _,v:=range lists{
+	for _, v := range lists {
 		err = fn(&v)
-		if err!= nil{
+		if err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func getIdToken(spec *vmv1.VirtualMachineSpec) (id,token string) {
-	if spec==nil{
+func getIdToken(spec *vmv1.VirtualMachineSpec) (id, token string) {
+	if spec == nil {
 		return CLOUDADMIN, ""
 	}
-	return spec.Project.ProjectID,spec.Project.Token
+	return spec.Project.ProjectID, spec.Project.Token
 }
 
-func deepcopyStat(st *stacks.ListedStack, dst *StatStack){
+func deepcopyStat(st *stacks.ListedStack, dst *StatStack) {
 	dst.Name = st.Name
 	dst.Id = st.ID
 	dst.Status = st.Status

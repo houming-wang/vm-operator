@@ -33,12 +33,12 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
-	metricsAddr string
-	enableLeaderElection bool
-	nettpl,vmtpl,vmgtpl,tmpdir string
-	pollingPeriod string
+	scheme                        = runtime.NewScheme()
+	setupLog                      = ctrl.Log.WithName("setup")
+	metricsAddr                   string
+	enableLeaderElection          bool
+	nettpl, vmtpl, vmgtpl, tmpdir string
+	pollingPeriod                 string
 )
 
 func init() {
@@ -63,14 +63,14 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	oss, err := osservice.NewOSService(nettpl,vmtpl,vmgtpl,tmpdir, ctrl.Log.WithName("OpenStack"),controllers.GetSpecNull)
+	oss, err := osservice.NewOSService(nettpl, vmtpl, vmgtpl, tmpdir, ctrl.Log.WithName("OpenStack"), controllers.GetSpecNull)
 	if err != nil {
 		setupLog.Error(err, "unable to init openstack service")
 		os.Exit(1)
 	}
-	du,err := time.ParseDuration(pollingPeriod)
+	du, err := time.ParseDuration(pollingPeriod)
 	if err != nil {
-		setupLog.Error(err, "unable to parse duration","str",pollingPeriod)
+		setupLog.Error(err, "unable to parse duration", "str", pollingPeriod)
 		os.Exit(1)
 	}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
