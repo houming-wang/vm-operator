@@ -12,7 +12,7 @@ parameters:
 
   existing_subnet:
     type: string
-    default: "{{ .network.existing_subnet }}"
+    default: {{ .network.existing_subnet }}
 {{ else }}
   private_network_cidr:
     type: string
@@ -23,13 +23,13 @@ parameters:
     description: fixed network name
     default: ""
 {{ end }}
-
+{{- if .network.floating_ip -}}
 {{ if eq .network.floating_ip "enable" }}
   external_network:
     type: string
     description: uuid/name of a network to use for floating ip addresses
 {{ end }}
-
+{{- end -}}
   neutron_az:
     type: comma_delimited_list
     description: neutron availability zone
@@ -50,7 +50,7 @@ resources:
       network: {get_resource: private_network}
       dns_nameservers: {get_param: dns_nameserver}
 {{ end }}
-
+{{- if .network.floating_ip -}}
 {{ if eq .network.floating_ip "enable" }}
   extrouter:
     type: OS::Neutron::Router
@@ -68,7 +68,7 @@ resources:
       subnet: {get_resource: fixed_subnet}
     {{ end }}
 {{ end }}
-
+{{- end -}}
 outputs:
 
     fixed_network:

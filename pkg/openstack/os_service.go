@@ -2,8 +2,6 @@ package openstack
 
 import (
 	"context"
-	vmv1 "easystack.io/vm-operator/pkg/api/v1"
-	"easystack.io/vm-operator/pkg/templates"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +9,9 @@ import (
 	"path"
 	"sync"
 	"time"
+
+	vmv1 "easystack.io/vm-operator/pkg/api/v1"
+	"easystack.io/vm-operator/pkg/templates"
 
 	"github.com/go-logr/logr"
 	"github.com/gophercloud/gophercloud"
@@ -45,20 +46,11 @@ const (
 
 // template file, it have to dependent on tpl content,
 // use single template file easy
-var (
-	ErrNotFound = errors.New("Not Found")
-)
-
 type StatStack struct {
 	Id           string
 	Name         string
 	Status       string
 	Statusreason string
-}
-
-type vm struct {
-	stat       *StatStack
-	latestSpec *vmv1.VirtualMachineSpec
 }
 
 type OSService struct {
@@ -337,9 +329,9 @@ func (oss *OSService) generatTemp(spec *vmv1.VirtualMachineSpec, fn func(params 
 	if err != nil {
 		return err
 	}
-	//TODO now we just neet network,volume and server sections
-	for _, v := range []string{"network", "volume", "server"} {
-		params[v] = parse(gjson.GetBytes(data, v))
+	//TODO now we just need some sections, not all
+	for _, v := range []string{"network", "volume", "server", "softwareConfig"} {
+		params[v] = templates.Parse(gjson.GetBytes(data, v))
 	}
 
 	for _, v := range []string{nettplname, vmgTplName, vmtplname} {
@@ -367,40 +359,6 @@ func (oss *OSService) generatTemp(spec *vmv1.VirtualMachineSpec, fn func(params 
 	}
 	fn(params, template)
 	return nil
-}
-
-func parse(result gjson.Result) interface{} {
-	if result.IsArray() {
-		var rets []interface{}
-		result.ForEach(func(_, value gjson.Result) bool {
-			rets = append(rets, parse(value))
-			return true
-		})
-		return rets
-	}
-	if result.IsObject() {
-		var rets = make(map[string]interface{})
-		result.ForEach(func(key, value gjson.Result) bool {
-			//TODO only string type
-			if key.Type == gjson.String {
-				rets[key.String()] = parse(value)
-			}
-			return true
-		})
-		return rets
-	}
-	switch result.Type {
-	case gjson.False:
-		return false
-	case gjson.Number:
-		return result.Int()
-	case gjson.String:
-		return result.String()
-	case gjson.True:
-		return true
-	default:
-		return ""
-	}
 }
 
 func iterStat(cli *gophercloud.ServiceClient, opts stacks.ListOpts, fn func(st *stacks.ListedStack) error) error {

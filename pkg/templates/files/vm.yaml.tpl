@@ -55,7 +55,7 @@ parameters:
     type: string
     description:
     default: []
-
+{{- if .network.floating_ip -}}
 {{ if eq .network.floating_ip "enable" }}
   external_network:
     type: string
@@ -66,20 +66,20 @@ parameters:
     type: string
     description:
 {{ end }}
-
+{{- end -}}
 
 {{ range $index, $v := .volume }}
   volume_{{ $index }}_name:
     type: string
-    default: "{{ $v.volume_name }}"
+    default: {{ $v.volume_name }}
 
   volume_{{ $index }}_type:
     type: string
-    default: "{{ $v.volume_type }}"
+    default: {{ $v.volume_type }}
 
   volume_{{ $index }}_size:
     type: string
-    default: "{{ $v.volume_size}}"
+    default: {{ $v.volume_size}}
 {{ end }}
 
 resources:
@@ -95,7 +95,7 @@ resources:
     properties:
       group: ungrouped
       config: |
-        {{ indent 8 .softwareConfig }}
+{{ indent 8 .softwareConfig }}
 
   node_bootstrap:
     type: OS::Heat::MultipartMime
@@ -145,7 +145,7 @@ resources:
   #
   # floating ip
   #
-
+{{- if .network.floating_ip -}}
 {{ if eq .network.floating_ip "enable" }}
   node_qos_policy:
     type: OS::Neutron::QoSPolicy
@@ -163,14 +163,14 @@ resources:
       port_id: {get_resource: node_eth0}
       qos_policy: {get_resource: node_qos_policy}
 {{ end }}
-
+{{- end -}}
 
   ######################################################################
   #
   # data volumes
   #
 
-{{- range $index, $v := .volume -}}
+{{ range $index, $v := .volume -}}
 {{ $char := add $index 98 }}
   data_volume_{{ $index }}:
     type: OS::Cinder::Volume
@@ -185,4 +185,4 @@ resources:
       instance_uuid: {get_resource: mixapp_node}
       volume_id: {get_resource: data_volume_{{ $index }}}
       mountpoint: /dev/vd{{ toChar $char }}
-{{- end -}}
+{{- end }}

@@ -3,6 +3,7 @@ package templates
 import (
 	"bytes"
 	"fmt"
+
 	"io/ioutil"
 	"os"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/tidwall/gjson"
 	"github.com/Masterminds/sprig"
 	"github.com/flosch/pongo2"
 	"github.com/go-logr/logr"
@@ -142,7 +144,7 @@ func (t *Template) AddTempFileMust(name string, filepath string) {
 	return
 }
 
-func (t *Template) RenderByName(name string, params map[string]interface{}) ([]byte, error) {
+func (t *Template) RenderByName(name string, params interface{}) ([]byte, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	buf := bufpool.Get().(*bytes.Buffer)
@@ -188,4 +190,39 @@ func toChar(v interface{}) string{
 	default:
 	}
 	return ""
+}
+
+
+func Parse(result gjson.Result) interface{} {
+	if result.IsArray() {
+		var rets []interface{}
+		result.ForEach(func(_, value gjson.Result) bool {
+			rets = append(rets, Parse(value))
+			return true
+		})
+		return rets
+	}
+	if result.IsObject() {
+		var rets = make(map[string]interface{})
+		result.ForEach(func(key, value gjson.Result) bool {
+			//TODO only string type
+			if key.Type == gjson.String {
+				rets[key.String()] = Parse(value)
+			}
+			return true
+		})
+		return rets
+	}
+	switch result.Type {
+	case gjson.False:
+		return false
+	case gjson.Number:
+		return result.Int()
+	case gjson.String:
+		return result.String()
+	case gjson.True:
+		return true
+	default:
+		return ""
+	}
 }

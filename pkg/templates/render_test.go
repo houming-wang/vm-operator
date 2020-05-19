@@ -1,11 +1,14 @@
 package templates
 
 import (
+	"encoding/json"
 	"os"
-
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"testing"
+
+	vmv1 "easystack.io/vm-operator/pkg/api/v1"
 	"github.com/go-logr/logr"
+	"github.com/tidwall/gjson"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 var (
 	log logr.Logger
@@ -23,11 +26,34 @@ func TestAddTempFileMust(t *testing.T){
 }
 
 func TestRenderByName(t *testing.T){
-	var paramlist = []map[string]interface{}{
-		map[string]interface{}{
-			"volume":map[string]string{"volume_name":"a","volume_type":"a","volume_size":"a"},
+	var paramlist = []vmv1.VirtualMachineSpec{
+		vmv1.VirtualMachineSpec{
+			Project:        vmv1.ProjectSpec{},
+			Server:         vmv1.ServerSpec{},
+			Network:        vmv1.NetworkSpec{
+				NeutronAz: "a",
+			},
+			Volume:         []vmv1.VolumeSpec{
+				vmv1.VolumeSpec{
+					VolumeName: "a",
+					VolumeType: "a",
+					VolumeSize: "a",
+				},
+			},
+			SoftwareConfig: []byte("abc"),
+			AssemblyPhase:  "",
+			StackID:        "",
+			HeatEvent:      nil,
 		},
 	}
-	engine.AddTempFileMust("net","./files/network.yaml.tpl")
-	t.Log(engine.RenderByName("net",paramlist[0]))
+	for _,v:=range paramlist{
+		bs,err:=json.Marshal(&v)
+		if err!= nil {
+			t.Fatalf(err.Error())
+		}
+		params := Parse(gjson.ParseBytes(bs))
+		t.Log(engine.RenderByName("net",params))
+		t.Log(engine.RenderByName("vm",params))
+		t.Log(engine.RenderByName("vmg",params))
+	}
 }

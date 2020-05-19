@@ -71,7 +71,7 @@ parameters:
     type: string
     description:
     default: []
-
+{{- if .network.floating_ip -}}
 {{ if eq .network.floating_ip "enable" }}
   external_network:
     type: string
@@ -86,7 +86,7 @@ parameters:
     type: string
     description:
 {{ end }}
-
+{{- end -}}
 
 resources:
 
@@ -105,8 +105,10 @@ resources:
       private_network_name: {get_param: private_network_name}
       private_network_cidr: {get_param: private_network_cidr}
     {{- end -}}
-    {{- if eq .network.floating_ip "enable" }}
+    {{- if .network.floating_ip -}}
+    {{ if eq .network.floating_ip "enable" }}
       external_network: {get_param: external_network}
+    {{ end }}
     {{- end -}}
       neutron_az: {get_param: neutron_az}
       private_network_name: ecns-private
@@ -147,15 +149,17 @@ resources:
           security_group: {get_param: security_group}
           fixed_network: {get_attr: [network, fixed_network]}
           fixed_subnet: {get_attr: [network, fixed_network]}
-        {{- if eq .network.floating_ip "enable" -}}
+        {{- if .network.floating_ip -}}
+        {{ if eq .network.floating_ip "enable" }}
           external_network: {get_param: external_network}
           floating_ip_bandwidth: {get_param: floating_ip_bandwidth}
+        {{ end }}
         {{- end -}}
-        {{- range $index, $v := .volume -}}
-          volume_{{ $index }}_name: "{{ $v.volume_name }}"
-          volume_{{ $index }}_type: "{{ $v.volume_type }}"
-          volume_{{ $index }}_size: "{{ $v.volume_size }}"
-        {{- end -}}
+        {{ range $index, $v := .volume }}
+          volume_{{ $index }}_name: {{ $v.volume_name }}
+          volume_{{ $index }}_type: {{ $v.volume_type }}
+          volume_{{ $index }}_size: {{ $v.volume_size }}
+        {{ end }}
 
 outputs:
 
