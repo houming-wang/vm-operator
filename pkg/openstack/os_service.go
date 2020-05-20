@@ -3,7 +3,6 @@ package openstack
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path"
